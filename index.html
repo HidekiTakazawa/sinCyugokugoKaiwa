@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-   <title>中国語で伝えよう</title>
+  <title>中国語で伝えよう</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -21,7 +21,6 @@
   <script type="text/babel">
     const GAS_URL = "https://script.google.com/macros/s/AKfycbw9dweqsCkA5L-DRj1bmPkELb471fZLnP4wmUSklgb4Pc1kU_3_arFD8LmquMpx6J3W/exec";
 
-
     const PALETTES =[
       { chinese: "text-green-800", speaker: "text-green-600", border: "border-green-400" },
       { chinese: "text-blue-800", speaker: "text-blue-600", border: "border-blue-400" },
@@ -30,7 +29,6 @@
       { chinese: "text-purple-800", speaker: "text-purple-600", border: "border-purple-400" }
     ];
 
-    // ★追加：2つの配列（ピンインの配列）を比較し、類似度を0〜100点で計算するアルゴリズム（レーベンシュタイン距離）
     const calculateSimilarity = (arr1, arr2) => {
       if (arr1.length === 0 && arr2.length === 0) return 100;
       if (arr1.length === 0 || arr2.length === 0) return 0;
@@ -44,9 +42,9 @@
         for (let i = 1; i <= arr1.length; i++) {
           const indicator = arr1[i - 1] === arr2[j - 1] ? 0 : 1;
           matrix[j][i] = Math.min(
-            matrix[j][i - 1] + 1, // 挿入
-            matrix[j - 1][i] + 1, // 削除
-            matrix[j - 1][i - 1] + indicator // 置換
+            matrix[j][i - 1] + 1, 
+            matrix[j - 1][i] + 1, 
+            matrix[j - 1][i - 1] + indicator 
           );
         }
       }
@@ -99,6 +97,14 @@
             setIsRecording(false);
           };
         }
+
+        // ★追加1：iOS対策として、アプリ起動時に音声リストをあらかじめ読み込んでおく
+        if (window.speechSynthesis) {
+          window.speechSynthesis.getVoices();
+          window.speechSynthesis.onvoiceschanged = () => {
+            window.speechSynthesis.getVoices();
+          };
+        }
       },[]);
 
       const loadLesson = async (sheetName) => {
@@ -144,9 +150,19 @@
         }
         window.speechSynthesis.cancel();
         setIsPlaying(line.id);
+        
         const utterance = new SpeechSynthesisUtterance(line.chinese);
         utterance.lang = 'zh-CN'; 
         utterance.rate = 0.9;     
+        
+        // ★追加2：中国語の音声エンジンを明示的に探してセットする（iOS対策）
+        const voices = window.speechSynthesis.getVoices();
+        // 'zh-CN', 'zh-TW', 'zh_CN' などの中国語音声を探す
+        const chineseVoice = voices.find(voice => voice.lang.replace('_', '-').toLowerCase().startsWith('zh'));
+        if (chineseVoice) {
+          utterance.voice = chineseVoice;
+        }
+
         utterance.onend = () => setIsPlaying(null);
         utterance.onerror = (e) => {
           console.error("音声読み上げエラー:", e);
@@ -177,7 +193,6 @@
       const evaluate = async (line, transcript) => {
         setLoadingEval(line.id);
         try {
-          // ★変更：記号やスペースを完全に除去して純粋な文字だけにする
           const normalizeText = (text) => {
             if (!text) return "";
             return text.replace(/[\s　，。？！、：；“”‘’（）\(\)\[\]【】,\.\?!:;"']/g, '');
@@ -186,26 +201,20 @@
           const targetClean = normalizeText(line.chinese);
           const userClean = normalizeText(transcript);
 
-          // ユーザーの表示用ピンイン
           const userPinyinDisplay = pinyinPro.pinyin(transcript, { toneType: 'symbol' });
 
           let score = 0;
           let feedback = "";
 
-          // 1. 簡体字が完全一致するかチェック
           if (targetClean === userClean) {
             score = 100;
             feedback = "完璧です！正しく発音されました。";
           } else {
-            // 2. 一致しない場合、ピンインを配列化して比較
-            // 例: "你好" -> ["nǐ", "hǎo"]
             const targetPinyinArr = pinyinPro.pinyin(targetClean, { type: 'array', toneType: 'symbol' });
             const userPinyinArr = pinyinPro.pinyin(userClean, { type: 'array', toneType: 'symbol' });
 
-            // レーベンシュタイン距離アルゴリズムで類似度を計算
             score = calculateSimilarity(targetPinyinArr, userPinyinArr);
 
-            // スコアに応じたフィードバック
             if (score === 100) {
               feedback = "完璧です！正しく発音されました。";
             } else if (score >= 80) {
@@ -228,7 +237,6 @@
         }
       };
 
-      // ★追加：練習記録をクリップボードにコピーする機能
       const copyToClipboard = () => {
         if (Object.keys(evalResults).length === 0) {
           alert("まだ練習記録がありません。");
@@ -258,7 +266,7 @@
 
       return (
         <div className="p-4 md:p-10 max-w-2xl mx-auto">
-         <h1 className="text-4xl font-serif mb-6 text-center pb-2 font-bold">中国語で伝えよう<span className="italic text-yellow-600">会話篇</span></h1>
+          <h1 className="text-4xl font-serif mb-6 text-center pb-2 font-bold">中国語で伝えよう<span className="italic text-yellow-600">会話篇</span></h1>
           
           <div className="mb-8 text-center border-b pb-6">
             <select 
@@ -270,7 +278,6 @@
               {sheets.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
 
-            {/* ★追加：動画ボタンと練習記録コピーボタンを並べて表示 */}
             <div className="mt-4 flex flex-wrap justify-center gap-4">
               {videoUrl && (
                 <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition shadow-sm text-sm">
@@ -278,7 +285,6 @@
                 </a>
               )}
               
-              {/* 評価結果が1つ以上ある場合のみコピーボタンを表示 */}
               {Object.keys(evalResults).length > 0 && (
                 <button 
                   onClick={copyToClipboard}
